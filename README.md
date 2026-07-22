@@ -2,7 +2,7 @@
 
 **Inventory Service with Circuit Breaker** — a Spring Boot inventory system whose one outbound call to a third-party supplier is wrapped end-to-end in Resilience4j (CircuitBreaker + Retry + RateLimiter + ThreadPoolBulkhead + TimeLimiter), so a flaky or slow supplier degrades gracefully instead of taking the service down.
 
-`Java 21` · `Spring Boot 3.3.2` · `Resilience4j 2.2.0` · `MySQL 8` · `Maven (multi-module)` · `Docker Compose` · `WireMock` · `JUnit 5 / Mockito`
+`Java 25` · `Spring Boot 4.0.6` · `Resilience4j 2.4.0` · `MySQL 8` · `Maven (multi-module)` · `Docker Compose` · `WireMock` · `JUnit 5 / Mockito`
 
 **Learning Track:** `springboot-resilience4j-demo` (Project 12 of 17)
 **Real-World Service Name:** `inventory-service`
@@ -112,8 +112,8 @@ Aspect ordering matters here: Resilience4j applies these decorators from the out
 
 ```
 inventory-service-parent/                 (reactor root, packaging=pom)
-├── pom.xml                               parent POM: Java 21, Spring Boot 3.3.2 BOM,
-│                                         Resilience4j 2.2.0 BOM, declares the two modules
+├── pom.xml                               parent POM: Java 25, Spring Boot 4.0.6 BOM,
+│                                         Resilience4j 2.4.0 BOM, declares the two modules
 ├── docker-compose.yml                    mysql + external-mock-service + inventory-service
 ├── .gitignore
 ├── inventory-service/                    the resilient caller (this is the "real" service)
@@ -170,18 +170,33 @@ inventory_items
 
 | Layer | Technology | Why |
 |---|---|---|
-| Language | Java 21 | LTS, required by parent POM (`java.version` / `maven.compiler.release`) |
-| Framework | Spring Boot 3.3.2 | Web, data, validation, actuator, AOP starters |
-| Resilience | Resilience4j 2.2.0 (`resilience4j-spring-boot3`) | CircuitBreaker, Retry, RateLimiter, ThreadPoolBulkhead, TimeLimiter in one aggregator starter |
-| AOP support | `spring-boot-starter-aop` | Required for Resilience4j's method-level annotations to be woven in |
-| Persistence | Spring Data JPA + Hibernate | `InventoryItem` CRUD |
+| Language | Java 25 | Required by parent POM (`java.version` / `maven.compiler.release`) |
+| Framework | Spring Boot 4.0.6 | Web, data, validation, actuator, AspectJ starters |
+| Resilience | Resilience4j 2.4.0 (`resilience4j-spring-boot4`) | CircuitBreaker, Retry, RateLimiter, ThreadPoolBulkhead, TimeLimiter in one aggregator starter. `resilience4j-spring-boot3` refuses to start on a Spring Boot 4 classpath as of 2.4.0 — `resilience4j-spring-boot4` is the required replacement |
+| AOP support | `spring-boot-starter-aspectj` | Required for Resilience4j's method-level annotations to be woven in (renamed from `spring-boot-starter-aop` in Spring Boot 4.0) |
+| Persistence | Spring Data JPA + Hibernate 7 | `InventoryItem` CRUD |
 | Database | MySQL 8.0 (`mysql-connector-j`) | inventory-service's system of record |
 | Test DB | H2 (in-memory, `MODE=MySQL`) | `@DataJpaTest` without a real MySQL instance |
-| HTTP client | `RestTemplate` (via `RestTemplateBuilder`) | Outbound call to the supplier |
+| HTTP client | `RestTemplate` (via `RestTemplateBuilder`, now in `spring-boot-starter-restclient`) | Outbound call to the supplier |
 | Metrics | Micrometer + `micrometer-registry-prometheus` | Exposes Resilience4j metrics (state, call counts) at `/actuator/prometheus` |
 | Build | Maven multi-module reactor | Shared parent POM + BOM imports across two modules |
-| Containerization | Docker (multi-stage builds) + Docker Compose | Local, one-command environment |
-| Testing | JUnit 5, Mockito, `@WebMvcTest`, `@DataJpaTest`, WireMock (`wiremock-standalone`) | Unit, slice, and true HTTP-level resilience integration tests |
+| Containerization | Docker (multi-stage builds, JDK 25 base images) + Docker Compose | Local, one-command environment |
+| Testing | JUnit 5, Mockito, `@WebMvcTest` (`spring-boot-starter-webmvc-test`), `@DataJpaTest` (`spring-boot-starter-data-jpa-test`), WireMock (`wiremock-standalone`) | Unit, slice, and true HTTP-level resilience integration tests |
+
+> **Migrated from Spring Boot 3.3.2 / Java 21 → Spring Boot 4.0.6 / Java 25.** Beyond the
+> version bumps, this required: swapping `resilience4j-spring-boot3` for
+> `resilience4j-spring-boot4` (with an explicit version, since the `resilience4j-bom:2.4.0`
+> doesn't yet manage that artifact's version); renaming `spring-boot-starter-aop` to
+> `spring-boot-starter-aspectj`; adding the newly-split `spring-boot-starter-restclient`,
+> `spring-boot-starter-webmvc-test` and `spring-boot-starter-data-jpa-test` starters (no
+> longer pulled in transitively by `spring-boot-starter-web`/`spring-boot-starter-test`);
+> updating `RestTemplateBuilder`'s package (`org.springframework.boot.restclient`) and its
+> renamed `connectTimeout`/`readTimeout` builder methods; and replacing the removed
+> `@MockBean`/`org.springframework.boot.test.mock.mockito` with
+> `@MockitoBean`/`org.springframework.test.context.bean.override.mockito` in both modules'
+> `@WebMvcTest` classes. Resilience4j's annotations (`@CircuitBreaker`, `@Retry`,
+> `@RateLimiter`, `@Bulkhead`, `@TimeLimiter`) and `resilience4j.*` YAML properties were
+> unaffected.
 
 ## 4. Configuration Explained
 
@@ -279,12 +294,12 @@ These four `mock.chaos.*` values are also mutable **at runtime** through `POST /
 
 | Path | Purpose |
 |---|---|
-| `pom.xml` (root) | Parent POM, `packaging=pom`. Pins Java 21, imports the Spring Boot and Resilience4j BOMs, declares the two reactor modules. Nothing here is deployable by itself. |
+| `pom.xml` (root) | Parent POM, `packaging=pom`. Pins Java 25, imports the Spring Boot and Resilience4j BOMs, declares the two reactor modules. Nothing here is deployable by itself. |
 | `docker-compose.yml` | Wires `mysql` + `external-mock-service` + `inventory-service` together with health-check-gated `depends_on` so inventory-service doesn't start racing against a MySQL that isn't ready yet. |
 | `.gitignore` | Standard Maven/IDE ignores (`target/`, `.idea/`, etc.) |
 | `inventory-service/` | The service under test/study — owns data, makes the resilience-guarded outbound call. |
-| `inventory-service/pom.xml` | Module POM: web, data-jpa, validation, actuator, AOP (required for Resilience4j annotations to be woven in), MySQL driver, `resilience4j-spring-boot3`, Micrometer Prometheus registry, and test-scoped H2 + `wiremock-standalone`. |
-| `inventory-service/Dockerfile` | Multi-stage build: Maven+JDK21 image builds the jar (`-pl inventory-service -am`, reactor-aware), then copies just the jar into a slim `eclipse-temurin:21-jre-alpine` runtime image running as a non-root `spring` user. |
+| `inventory-service/pom.xml` | Module POM: web, restclient, data-jpa, validation, actuator, AspectJ (required for Resilience4j annotations to be woven in), MySQL driver, `resilience4j-spring-boot4`, Micrometer Prometheus registry, and test-scoped H2 + `spring-boot-starter-webmvc-test`/`spring-boot-starter-data-jpa-test` + `wiremock-standalone`. |
+| `inventory-service/Dockerfile` | Multi-stage build: Maven+JDK25 image builds the jar (`-pl inventory-service -am`, reactor-aware), then copies just the jar into a slim `eclipse-temurin:25-jre-alpine` runtime image running as a non-root `spring` user. |
 | `.../config/RestTemplateConfig.java` | Builds the shared `RestTemplate` bean with explicit connect/read timeouts, layered underneath the Resilience4j TimeLimiter. |
 | `.../config/ResilienceEventLoggingConfig.java` | Registers a `RegistryEventConsumer<CircuitBreaker>` bean; Resilience4j's starter auto-detects it and wires a listener onto every CircuitBreaker instance that logs CLOSED/OPEN/HALF_OPEN transitions. |
 | `.../controller/InventoryController.java` | REST surface: CRUD on inventory items plus the `/availability` endpoint that triggers the supplier call. |
@@ -311,7 +326,7 @@ These four `mock.chaos.*` values are also mutable **at runtime** through `POST /
 ### Prerequisites
 
 - Docker and Docker Compose
-- (For local, non-Docker development) JDK 21 and Maven 3.9+
+- (For local, non-Docker development) JDK 25 and Maven 3.9+
 
 ### Run everything with Docker Compose
 
@@ -512,7 +527,8 @@ mvn -pl external-mock-service -am test
 
 `SupplierClientIntegrationTest` runs under the `test` Spring profile, which loads `application-test.yml` — a tightened resilience config (see section 6) so the breaker/timeouts trip within the test's timeout budget instead of the production-sized 10s/2s windows.
 
-> Local sandbox note: on some JDKs newer than the project's Java 21 target, Mockito's bundled ByteBuddy needs `-Dnet.bytebuddy.experimental=true` to run (e.g. `mvn test -Dnet.bytebuddy.experimental=true`). This is unrelated to the Java 21 target used by the project and its Dockerfiles — it's purely a quirk of running tests on a newer local JDK.
+> Verified locally on JDK 25.0.3 / Maven 3.9.16: `mvn test` passes all 25 tests across both
+> modules (17 in inventory-service, 8 in external-mock-service) with no extra flags needed.
 
 ## 9. Docker
 
@@ -520,8 +536,8 @@ mvn -pl external-mock-service -am test
 
 Both follow the identical two-stage pattern:
 
-1. **Build stage** (`maven:3.9.8-eclipse-temurin-21`) — copies the root `pom.xml` and both modules' `pom.xml` files first (so `dependency:go-offline` can populate the local repo as its own cached Docker layer before any source changes invalidate it), then copies that module's `src/` and runs `mvn -pl <module> -am package -DskipTests` — the `-am` flag makes Maven also build the parent reactor context each module needs.
-2. **Runtime stage** (`eclipse-temurin:21-jre-alpine`) — a minimal JRE-only image. Creates and switches to a non-root `spring` user before copying in just the built jar and setting the `ENTRYPOINT`. Nothing from the Maven build toolchain ships in the final image.
+1. **Build stage** (`maven:3.9.16-eclipse-temurin-25`) — copies the root `pom.xml` and both modules' `pom.xml` files first (so `dependency:go-offline` can populate the local repo as its own cached Docker layer before any source changes invalidate it), then copies that module's `src/` and runs `mvn -pl <module> -am package -DskipTests` — the `-am` flag makes Maven also build the parent reactor context each module needs.
+2. **Runtime stage** (`eclipse-temurin:25-jre-alpine`) — a minimal JRE-only image. Creates and switches to a non-root `spring` user before copying in just the built jar and setting the `ENTRYPOINT`. Nothing from the Maven build toolchain ships in the final image.
 
 ### `docker-compose.yml`
 
@@ -556,7 +572,7 @@ Without it, a single failed call out of one recorded call would be a 100% failur
 
 **Common mistakes with Resilience4j:**
 - Configuring Retry to retry *every* exception, including 4xx/5xx business errors — causing retry storms against an already-struggling dependency.
-- Forgetting `spring-boot-starter-aop` — the `@CircuitBreaker`/`@Retry`/etc. annotations are silently ignored without AOP proxying enabled.
+- Forgetting `spring-boot-starter-aspectj` (renamed from `spring-boot-starter-aop` in Spring Boot 4.0) — the `@CircuitBreaker`/`@Retry`/etc. annotations are silently ignored without AOP proxying enabled.
 - Using the semaphore-based `@Bulkhead` when the intent was thread isolation — semaphore bulkheads limit *concurrency* but still run on the caller's thread, so a hung call still occupies a request thread. `type = THREADPOOL` is required for true isolation.
 - Mismatched fallback method signature — Resilience4j resolves the fallback by matching parameter types plus a trailing `Throwable`; a subtle mismatch fails silently at startup or throws at runtime.
 - Setting `waitDurationInOpenState` too short for production (this project uses 10s deliberately for fast local demos) — in production, a value that's too short means retrying a dependency that's still down, defeating the purpose of the breaker.
