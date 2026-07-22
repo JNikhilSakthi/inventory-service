@@ -1,7 +1,7 @@
 package com.medha.inventoryservice.config;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.boot.restclient.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestTemplate;
@@ -23,8 +23,8 @@ public class RestTemplateConfig {
             @Value("${supplier.connect-timeout-ms:1000}") long connectTimeoutMs,
             @Value("${supplier.read-timeout-ms:2000}") long readTimeoutMs) {
         return builder
-                .setConnectTimeout(Duration.ofMillis(connectTimeoutMs))
-                .setReadTimeout(Duration.ofMillis(readTimeoutMs))
+                .connectTimeout(Duration.ofMillis(connectTimeoutMs))
+                .readTimeout(Duration.ofMillis(readTimeoutMs))
                 .build();
     }
 }

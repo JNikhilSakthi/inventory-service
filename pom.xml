@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.3.2</version>
+        <version>4.0.6</version>
         <relativePath/>
     </parent>
 
@@ -25,10 +25,20 @@
     </description>
 
     <properties>
-        <java.version>21</java.version>
-        <maven.compiler.release>21</maven.compiler.release>
-        <resilience4j.version>2.2.0</resilience4j.version>
+        <java.version>25</java.version>
+        <maven.compiler.release>25</maven.compiler.release>
+        <!-- resilience4j 2.4.0 is the first release with a dedicated Spring Boot 4 / Spring
+             Framework 7 module (resilience4j-spring-boot4). The resilience4j-spring-boot3
+             starter actively refuses to start on a Spring Boot 4 classpath as of this
+             release, so the module poms below depend on resilience4j-spring-boot4 instead. -->
+        <resilience4j.version>2.4.0</resilience4j.version>
         <wiremock.version>3.3.1</wiremock.version>
+        <!-- Not currently used by either module (no lombok dependency is declared), but
+             pinned here so that if/when it is added, annotation processing works correctly
+             under JDK 25: Lombok 1.18.44 is the first release confirmed to fix val/
+             @ExtensionMethod javac errors on JDK 25 and to add JDK 26 support. Versions
+             prior to 1.18.42 are broken on JDK 25/26 annotation processing. -->
+        <lombok.version>1.18.44</lombok.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 

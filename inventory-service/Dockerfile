@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- Build stage ----
-FROM maven:3.9.8-eclipse-temurin-21 AS build
+FROM maven:3.9.16-eclipse-temurin-25 AS build
 WORKDIR /workspace
 
 # Copy POMs first so Maven can resolve the reactor and cache dependencies as a separate layer.
@@ -14,7 +14,7 @@ COPY inventory-service/src inventory-service/src
 RUN mvn -q -pl inventory-service -am package -DskipTests -B
 
 # ---- Runtime stage ----
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
 RUN addgroup -S spring && adduser -S spring -G spring
 COPY --from=build /workspace/inventory-service/target/inventory-service.jar app.jar

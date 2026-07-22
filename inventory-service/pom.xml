@@ -27,6 +27,13 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+        <!-- RestTemplateBuilder was extracted out of spring-boot-starter-web's autoconfiguration
+             into its own module in Spring Boot 4.0 (org.springframework.boot.restclient); the
+             starter must now be declared explicitly to get it back on the classpath. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-restclient</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
@@ -39,10 +46,12 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
-        <!-- Required for Resilience4j's method-level annotations (@CircuitBreaker, @Retry, ...) -->
+        <!-- Required for Resilience4j's method-level annotations (@CircuitBreaker, @Retry, ...).
+             spring-boot-starter-aop was renamed to spring-boot-starter-aspectj in Spring Boot
+             4.0 (same spring-aop/aspectjweaver contents, new artifact id). -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-aop</artifactId>
+            <artifactId>spring-boot-starter-aspectj</artifactId>
         </dependency>
 
         <dependency>
@@ -52,10 +61,16 @@
         </dependency>
 
         <!-- Resilience4j: aggregator starter wires up CircuitBreaker, Retry, RateLimiter,
-             Bulkhead and TimeLimiter aspects plus their Actuator/metrics integration. -->
+             Bulkhead and TimeLimiter aspects plus their Actuator/metrics integration.
+             resilience4j-spring-boot3 is rejected on a Spring Boot 4 classpath as of
+             resilience4j 2.4.0; resilience4j-spring-boot4 is the required replacement.
+             NOTE: resilience4j-bom:2.4.0 does not yet manage this artifact's version
+             (Spring Boot 4 support landed after the bom's own dependencyManagement was
+             cut), so the version is pinned explicitly here via the shared property. -->
         <dependency>
             <groupId>io.github.resilience4j</groupId>
-            <artifactId>resilience4j-spring-boot3</artifactId>
+            <artifactId>resilience4j-spring-boot4</artifactId>
+            <version>${resilience4j.version}</version>
         </dependency>
         <dependency>
             <groupId>io.micrometer</groupId>
@@ -66,6 +81,19 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- @WebMvcTest and @DataJpaTest moved out of spring-boot-test-autoconfigure into their
+             own per-feature test-autoconfigure starters in Spring Boot 4.0; spring-boot-starter-
+             test no longer pulls them in transitively. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa-test</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
