@@ -1,0 +1,98 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: inventory-service
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:inventory_db}?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC
+    username: ${DB_USERNAME:inventory_user}
+    password: ${DB_PASSWORD:inventory_pass}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+# Base URL of the (fake) supplier system this service depends on. In docker-compose this
+# resolves to the external-mock-service container via Docker's internal DNS.
+supplier:
+  base-url: ${SUPPLIER_BASE_URL:http://localhost:8081}
+  connect-timeout-ms: ${SUPPLIER_CONNECT_TIMEOUT_MS:1000}
+  read-timeout-ms: ${SUPPLIER_READ_TIMEOUT_MS:2000}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      supplierService:
+        registerHealthIndicator: true
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        slowCallRateThreshold: 80
+        slowCallDurationThreshold: 2s
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenStateEnabled: true
+        recordExceptions:
+          - org.springframework.web.client.ResourceAccessException
+          - org.springframework.web.client.HttpServerErrorException
+          - java.util.concurrent.TimeoutException
+          - com.medha.inventoryservice.service.SupplierClientException
+  retry:
+    instances:
+      supplierService:
+        maxAttempts: 3
+        waitDuration: 300ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        # Only transient/network-ish failures are retried. A 5xx from the supplier is
+        # recorded as a CircuitBreaker failure immediately without burning retry attempts.
+        retryExceptions:
+          - org.springframework.web.client.ResourceAccessException
+          - java.util.concurrent.TimeoutException
+        ignoreExceptions:
+          - com.medha.inventoryservice.exception.ResourceNotFoundException
+  ratelimiter:
+    instances:
+      supplierService:
+        limitForPeriod: 20
+        limitRefreshPeriod: 1s
+        timeoutDuration: 0s
+  thread-pool-bulkhead:
+    instances:
+      supplierService:
+        coreThreadPoolSize: 5
+        maxThreadPoolSize: 10
+        queueCapacity: 20
+        keepAliveDuration: 20ms
+  timelimiter:
+    instances:
+      supplierService:
+        timeoutDuration: 2s
+        cancelRunningFuture: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,circuitbreakers,circuitbreakerevents,retries,ratelimiters,bulkheads,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  health:
+    circuitbreakers:
+      enabled: true
+  metrics:
+    tags:
+      application: inventory-service
+
+logging:
+  level:
+    com.medha.inventoryservice: INFO
+    io.github.resilience4j: DEBUG

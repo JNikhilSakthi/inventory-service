@@ -1,0 +1,57 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: inventory-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: inventory_db
+      MYSQL_USER: inventory_user
+      MYSQL_PASSWORD: inventory_pass
+      MYSQL_ROOT_PASSWORD: root_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_pass"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  external-mock-service:
+    build:
+      context: .
+      dockerfile: external-mock-service/Dockerfile
+    container_name: external-mock-service
+    restart: unless-stopped
+    environment:
+      MOCK_CHAOS_FAILURE_RATE: "0.3"
+      MOCK_CHAOS_MIN_DELAY_MS: "50"
+      MOCK_CHAOS_MAX_DELAY_MS: "800"
+      MOCK_CHAOS_FORCE_FAILURE: "false"
+    ports:
+      - "8081:8081"
+
+  inventory-service:
+    build:
+      context: .
+      dockerfile: inventory-service/Dockerfile
+    container_name: inventory-service
+    restart: unless-stopped
+    environment:
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_NAME: inventory_db
+      DB_USERNAME: inventory_user
+      DB_PASSWORD: inventory_pass
+      SUPPLIER_BASE_URL: http://external-mock-service:8081
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      external-mock-service:
+        condition: service_started
+
+volumes:
+  mysql_data:
